@@ -1,66 +1,95 @@
-import { useState, useEffect } from 'react'
-import "prismjs/themes/prism-tomorrow.css"
-import Editor from "react-simple-code-editor"
-import prism from "prismjs"
-import Markdown from "react-markdown"
-import rehypeHighlight from "rehype-highlight";
-import "highlight.js/styles/github-dark.css";
-import axios from 'axios'
+import { useState, useCallback } from 'react'
+import Header from './components/Header'
+import CodeEditor from './components/CodeEditor'
+import ReviewPanel from './components/ReviewPanel'
+import Loading from './components/Loading'
+import ErrorState from './components/ErrorMessage'
+import { useCodeReview } from './hooks/useCodeReview'
 import './App.css'
 
+const DEFAULT_CODE = `function sum(a, b) {
+    return a + b;
+}`
+
 function App() {
-  const [ count, setCount ] = useState(0)
-  const [ code, setCode ] = useState(` function sum() {
-  return 1 + 1
-}`)
+  const [code, setCode] = useState(DEFAULT_CODE)
+  const [language, setLanguage] = useState('javascript')
+  const { reviewCode, isReviewing, review, error } = useCodeReview()
+  const [status, setStatus] = useState('Ready')
 
-  const [ review, setReview ] = useState(``)
+  const handleReview = useCallback(() => {
+    if (!code.trim() || isReviewing) return
+    setStatus('Analyzing')
+    reviewCode(code, language)
+  }, [code, language, reviewCode, isReviewing])
 
-  useEffect(() => {
-    prism.highlightAll()
+  const handleClear = useCallback(() => {
+    setCode('')
+    setStatus('Ready')
   }, [])
 
-  async function reviewCode() {
-    const response = await axios.post('http://localhost:3000/ai/get-review', { code })
-    setReview(response.data)
-  }
+  // Update status based on review state
+  useCallback(() => {
+    if (isReviewing) setStatus('Analyzing')
+    else if (review) setStatus('Review Complete')
+    else if (error) setStatus('Offline')
+    else setStatus('Ready')
+  }, [isReviewing, review, error])
+
+  const handleRetry = useCallback(() => {
+    handleReview()
+  }, [handleReview])
 
   return (
-    <>
-      <main>
-        <div className="left">
-          <div className="code">
-            <Editor
-              value={code}
-              onValueChange={code => setCode(code)}
-              highlight={code => prism.highlight(code, prism.languages.javascript, "javascript")}
-              padding={10}
-              style={{
-                fontFamily: '"Fira code", "Fira Mono", monospace',
-                fontSize: 16,
-                border: "1px solid #ddd",
-                borderRadius: "5px",
-                height: "100%",
-                width: "100%"
-              }}
-            />
-          </div>
-          <div
-            onClick={reviewCode}
-            className="review">Review</div>
+    <div className="app">
+      <Header status={status} />
+      <main className="app-main">
+        <div className="editor-section">
+          <CodeEditor
+            value={code}
+            onChange={setCode}
+            disabled={isReviewing}
+            language={language}
+            onLanguageChange={setLanguage}
+          />
         </div>
-        <div className="right">
-          <Markdown
-
-            rehypePlugins={[ rehypeHighlight ]}
-
-          >{review}</Markdown>
+        <div className="review-section">
+          {isReviewing ? (
+            <Loading />
+          ) : error ? (
+            <ErrorState message="We couldn't analyze your code right now. Please try again." onRetry={handleRetry} />
+          ) : (
+            <ReviewPanel review={review} />
+          )}
         </div>
       </main>
-    </>
+      <footer className="app-toolbar">
+        <div className="toolbar-left">
+          <span className="toolbar-item" id="line-count">Lines: {code.split('\n').length}</span>
+          <span className="toolbar-divider">|</span>
+          <span className="toolbar-item" id="char-count">Characters: {code.length}</span>
+        </div>
+        <div className="toolbar-right">
+          <button
+            onClick={handleClear}
+            disabled={isReviewing || !code.trim()}
+            className="toolbar-button clear-button"
+            aria-label="Clear editor and review"
+          >
+            Clear
+          </button>
+          <button
+            onClick={handleReview}
+            disabled={isReviewing || !code.trim()}
+            className="toolbar-button review-button"
+            aria-label="Review code"
+          >
+            {isReviewing ? 'Analyzing...' : 'Review Code'}
+          </button>
+        </div>
+      </footer>
+    </div>
   )
 }
-
-
 
 export default App

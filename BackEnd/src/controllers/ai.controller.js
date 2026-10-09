@@ -1,17 +1,17 @@
 const aiService = require("../services/ai.service")
+const logger = require("../utils/logger")
 
+const getReview = async (req, res, next) => {
+  try {
+    const { code } = req.body
 
-module.exports.getReview = async (req, res) => {
+    const review = await aiService(code)
 
-    const code = req.body.code;
-
-    if (!code) {
-        return res.status(400).send("Prompt is required");
-    }
-
-    const response = await aiService(code);
-
-
-    res.send(response);
-
+    res.json(review)
+  } catch (error) {
+    logger.error(`Controller error: ${error.message}`)
+    next(error)
+  }
 }
+
+module.exports = { getReview }

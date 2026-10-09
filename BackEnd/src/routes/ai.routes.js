@@ -1,10 +1,9 @@
-const express = require('express');
+const express = require('express')
 const aiController = require("../controllers/ai.controller")
+const { validateReviewRequest } = require("../middleware/validation.middleware")
 
-const router = express.Router();
+const router = express.Router()
 
+router.post("/get-review", validateReviewRequest, aiController.getReview)
 
-router.post("/get-review", aiController.getReview)
-
-
-module.exports = router;    
+module.exports = router
